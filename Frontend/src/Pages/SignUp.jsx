@@ -26,13 +26,15 @@ function SignUp() {
     const [err,setErr]=useState("")
     const [loading,setLoading]=useState(false)
     const dispatch=useDispatch()
+
+    // for API fecthing 2 ways 1: using fecth funct  2: using axion lib ( we used axion lib)
      const handleSignUp=async () => {
         setLoading(true)
         try {
-            const result=await axios.post(`${serverUrl}/api/auth/signup`,{
-                fullName,email,password,mobile,role
-            },{withCredentials:true})
-            dispatch(setUserData(result.data))
+            const result=await axios.post(`${serverUrl}/api/auth/signup`,{      // server url created in the app.jsx frontend
+                fullName,email,password,mobile,role     //data to send
+            },{withCredentials:true})                   //cookie se access kar paye
+            dispatch(setUserData(result.data))          
             setErr("")
             setLoading(false)
         } catch (error) {

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { serverUrl } from '../App';
 import { ClipLoader } from 'react-spinners';
 function ForgotPassword() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(1)     //3 state : 1-email input  2.otp-send& verify  3.password set 
   const [email,setEmail]=useState("")
   const [otp,setOtp]=useState("")
   const [newPassword,setNewPassword]=useState("")
@@ -13,7 +13,8 @@ function ForgotPassword() {
   const [err,setErr]=useState("")
   const navigate=useNavigate()
 const [loading,setLoading]=useState(false)
-  const handleSendOtp=async () => {
+
+  const handleSendOtp=async () => {         // fectch api
     setLoading(true)
     try {
       const result=await axios.post(`${serverUrl}/api/auth/send-otp`,{email},{withCredentials:true})
@@ -62,7 +63,7 @@ const [loading,setLoading]=useState(false)
           <IoIosArrowRoundBack size={30} className='text-[#ff4d2d] cursor-pointer' onClick={()=>navigate("/signin")}/>
           <h1 className='text-2xl font-bold text-center text-[#ff4d2d]'>Forgot Password</h1>
         </div>
-        {step == 1
+        {step == 1    //entering email pg
           &&
           <div>
  <div className='mb-6'>
@@ -75,7 +76,7 @@ const [loading,setLoading]=useState(false)
                  {err && <p className='text-red-500 text-center my-[10px]'>*{err}</p>}
           </div>}
 
-         {step == 2
+         {step == 2     // entering otp and verify page
           &&
           <div>
  <div className='mb-6'>
@@ -87,7 +88,7 @@ const [loading,setLoading]=useState(false)
             </button>
                 {err && <p className='text-red-500 text-center my-[10px]'>*{err}</p>}
           </div>}
-          {step == 3
+          {step == 3    // set net password page
           &&
           <div>
  <div className='mb-6'>
