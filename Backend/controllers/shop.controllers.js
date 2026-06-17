@@ -1,22 +1,38 @@
 import Shop from "../models/shop.model.js";
+import { geocodeLocation, toGeoPoint, resolveNearbyShops } from "../utils/location.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import User from "../models/user.model.js";
 
 export const createEditShop=async (req,res) => {
     try {
-       const {name,city,state,address}=req.body
+             const {name,city,state,address,lat,lon}=req.body
        let image;
+             let location;
        if(req.file){
         console.log(req.file)
         image=await uploadOnCloudinary(req.file.path)
        } 
        let shop=await Shop.findOne({owner:req.userId})
+             const existingImage = shop?.image;
+             const latitude = Number(lat);
+             const longitude = Number(lon);
+             if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+                location = toGeoPoint(latitude, longitude);
+             } else {
+                const locationQuery = [name, address, city, state].filter(Boolean).join(", ");
+                const geoResult = await geocodeLocation(locationQuery);
+                if (geoResult) {
+                    location = toGeoPoint(geoResult.latitude, geoResult.longitude);
+                }
+             }
        if(!shop){
         shop=await Shop.create({
-        name,city,state,address,image,owner:req.userId
+                name,city,state,address,image,owner:req.userId,location
        })
        }else{
          shop=await Shop.findByIdAndUpdate(shop._id,{
-        name,city,state,address,image,owner:req.userId
+                name,city,state,address,image:image || existingImage,owner:req.userId,
+                ...(location ? { location } : {}),
        },{new:true})
        }
       
@@ -46,9 +62,13 @@ export const getShopByCity=async (req,res) => {
     try {
         const {city}=req.params
 
-        const shops=await Shop.find({
-            city:{$regex:new RegExp(`^${city}$`, "i")}
-        }).populate('items')
+        const shops = await resolveNearbyShops({
+            User,
+            Shop,
+            userId: req.userId,
+            city,
+        })
+
         if(!shops){
             return res.status(400).json({message:"shops not found"})
         }

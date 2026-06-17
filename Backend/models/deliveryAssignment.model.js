@@ -24,6 +24,50 @@ const deliveryAssignmentSchema = new mongoose.Schema({
          ref:"User",
          default:null
     },
+    counteredBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+    },
+    offeredFee: {
+        type: Number,
+        default: 0,
+    },
+    counterOfferFee: {
+        type: Number,
+        default: null,
+    },
+    bidStatus: {
+        type: String,
+        enum: ["pending", "countered", "accepted", "rejected"],
+        default: "pending",
+    },
+    bidHistory: [
+        {
+            fromRole: {
+                type: String,
+                enum: ["owner", "deliveryBoy"],
+                required: true,
+            },
+            action: {
+                type: String,
+                enum: ["offer", "counter", "accept", "reject"],
+                required: true,
+            },
+            fee: {
+                type: Number,
+                default: null,
+            },
+            note: {
+                type: String,
+                default: "",
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now,
+            },
+        },
+    ],
     status:{
         type:String,
         enum:["brodcasted","assigned","completed"],

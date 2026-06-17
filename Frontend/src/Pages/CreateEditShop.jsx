@@ -9,14 +9,21 @@ import axios from 'axios';
 import { serverUrl } from '../App';
 import { setMyShopData } from '../redux/ownerSlice';
 import { ClipLoader } from 'react-spinners';
+import LocationPickerModal from '../components/LocationPickerModal';
 function CreateEditShop() {
     const navigate = useNavigate()
     const { myShopData } = useSelector(state => state.owner)
     const { currentCity,currentState,currentAddress } = useSelector(state => state.user)
+        const [showLocationPicker,setShowLocationPicker]=useState(false)
     const [name,setName]=useState(myShopData?.name || "")
      const [address,setAddress]=useState(myShopData?.address || currentAddress)
      const [city,setCity]=useState(myShopData?.city || currentCity)
        const [state,setState]=useState(myShopData?.state || currentState)
+             const [shopLocation,setShopLocation]=useState(
+                myShopData?.location?.coordinates?.length === 2
+                    ? { lat: myShopData.location.coordinates[1], lon: myShopData.location.coordinates[0] }
+                    : null
+             )
        const [frontendImage,setFrontendImage]=useState(myShopData?.image || null)
        const [backendImage,setBackendImage]=useState(null)
        const [loading,setLoading]=useState(false)
@@ -36,6 +43,10 @@ function CreateEditShop() {
            formData.append("city",city) 
            formData.append("state",state) 
            formData.append("address",address) 
+           if(shopLocation?.lat && shopLocation?.lon){
+            formData.append("lat",shopLocation.lat)
+            formData.append("lon",shopLocation.lon)
+           }
            if(backendImage){
             formData.append("image",backendImage)
            }
@@ -50,6 +61,20 @@ function CreateEditShop() {
        }
     return (
         <div className='flex justify-center flex-col items-center p-6 bg-gradient-to-br from-orange-50 relative to-white min-h-screen'>
+                        <LocationPickerModal
+                            open={showLocationPicker}
+                            initialLocation={shopLocation}
+                            initialAddress={address || city || currentCity || ""}
+                            initialMode="manual"
+                            onClose={() => setShowLocationPicker(false)}
+                            onSave={({ lat, lon, address: pickedAddress, city: pickedCity, state: pickedState }) => {
+                                setShopLocation({ lat, lon })
+                                if (pickedAddress) setAddress(pickedAddress)
+                                if (pickedCity) setCity(pickedCity)
+                                if (pickedState) setState(pickedState)
+                                setShowLocationPicker(false)
+                            }}
+                        />
             <div className='absolute top-[20px] left-[20px] z-[10] mb-[10px]' onClick={() => navigate("/")}>
                 <IoIosArrowRoundBack size={35} className='text-[#ff4d2d]' />
             </div>
@@ -96,6 +121,26 @@ function CreateEditShop() {
                         <input type="text" placeholder='Enter Shop Address' className='w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500' onChange={(e)=>setAddress(e.target.value)}
                         value={address}/> 
                     </div>
+                                        <div className='rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-4'>
+                                                <div className='flex items-center justify-between gap-3'>
+                                                    <div>
+                                                        <p className='text-sm font-semibold text-gray-800'>Shop location</p>
+                                                        <p className='text-xs text-gray-500'>Pin the exact restaurant location on the map.</p>
+                                                    </div>
+                                                    <button
+                                                        type='button'
+                                                        onClick={() => setShowLocationPicker(true)}
+                                                        className='rounded-full bg-[#ff4d2d] px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-orange-600'
+                                                    >
+                                                        {shopLocation ? 'Update pin' : 'Set pin'}
+                                                    </button>
+                                                </div>
+                                                <div className='mt-3 rounded-xl bg-white p-3 text-sm text-gray-600 shadow-sm'>
+                                                    {shopLocation
+                                                        ? `Saved coordinates: ${shopLocation.lat.toFixed(5)}, ${shopLocation.lon.toFixed(5)}`
+                                                        : 'No location selected yet.'}
+                                                </div>
+                                        </div>
                     <button className='w-full bg-[#ff4d2d] text-white px-6 py-3 rounded-lg font-semibold shadow-md hover:bg-orange-600 hover:shadow-lg transition-all duration-200 cursor-pointer' disabled={loading}>
                         {loading?<ClipLoader size={20} color='white'/>:"Save"}
                     

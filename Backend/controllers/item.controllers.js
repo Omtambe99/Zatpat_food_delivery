@@ -1,6 +1,8 @@
 import Item from "../models/item.model.js";
 import Shop from "../models/shop.model.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import User from "../models/user.model.js";
+import { resolveNearbyShops } from "../utils/location.js";
 
 export const addItem = async (req, res) => {
     try {
@@ -96,9 +98,12 @@ export const getItemByCity = async (req, res) => {
         if (!city) {
             return res.status(400).json({ message: "city is required" })
         }
-        const shops = await Shop.find({
-            city: { $regex: new RegExp(`^${city}$`, "i") }
-        }).populate('items')
+        const shops = await resolveNearbyShops({
+            User,
+            Shop,
+            userId: req.userId,
+            city,
+        })
         if (!shops) {
             return res.status(400).json({ message: "shops not found" })
         }
@@ -133,9 +138,12 @@ export const searchItems=async (req,res) => {
         if(!query || !city){
             return null
         }
-        const shops=await Shop.find({
-            city:{$regex:new RegExp(`^${city}$`, "i")}
-        }).populate('items')
+        const shops = await resolveNearbyShops({
+            User,
+            Shop,
+            userId: req.userId,
+            city,
+        })
         if(!shops){
             return res.status(400).json({message:"shops not found"})
         }

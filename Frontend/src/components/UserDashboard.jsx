@@ -98,7 +98,10 @@ setRightButton(element.scrollLeft+element.clientWidth<element.scrollWidth)
 
       <div className="w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]">
 
-        <h1 className='text-gray-800 text-2xl sm:text-3xl'>Inspiration for your first order</h1>
+        <div className='flex flex-col gap-1'>
+          <h1 className='text-gray-900 text-2xl sm:text-3xl font-semibold'>Restaurants picked for you</h1>
+          <p className='text-sm text-gray-500'>Suggestions stay in sync with your saved location.</p>
+        </div>
         <div className='w-full relative'>
           {showLeftCateButton &&  <button className='absolute left-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(cateScrollRef,"left")}><FaCircleChevronLeft />
           </button>}
@@ -116,8 +119,11 @@ setRightButton(element.scrollLeft+element.clientWidth<element.scrollWidth)
         </div>
       </div>
 
-      <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]'>
- <h1 className='text-gray-800 text-2xl sm:text-3xl'>Best Shop in {currentCity}</h1>
+       <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]'>
+     <div className='flex flex-col gap-1'>
+      <h1 className='text-gray-900 text-2xl sm:text-3xl font-semibold'>Best shops nearby</h1>
+      <p className='text-sm text-gray-500'>Updated automatically from your latest location.</p>
+     </div>
  <div className='w-full relative'>
           {showLeftShopButton &&  <button className='absolute left-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(shopScrollRef,"left")}><FaCircleChevronLeft />
           </button>}
@@ -136,9 +142,10 @@ setRightButton(element.scrollLeft+element.clientWidth<element.scrollWidth)
       </div>
 
       <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]'>
-       <h1 className='text-gray-800 text-2xl sm:text-3xl'>
-        Suggested Food Items
-       </h1>
+       <div className='flex flex-col gap-1'>
+        <h1 className='text-gray-900 text-2xl sm:text-3xl font-semibold'>Suggested food items</h1>
+        <p className='text-sm text-gray-500'>Filtered from the location you last saved.</p>
+       </div>
 
 <div className='w-full h-auto flex flex-wrap gap-[20px] justify-center'>
 {updatedItemsList?.map((item,index)=>(
