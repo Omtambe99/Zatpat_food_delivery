@@ -25,15 +25,21 @@ function SignIn() {
     const dispatch=useDispatch()
      const handleSignIn=async () => {
         setLoading(true)
+        setErr("")
         try {
             const result=await axios.post(`${serverUrl}/api/auth/signin`,{
                 email,password
-            },{withCredentials:true})
+            },{withCredentials:true, timeout: 60000})
            dispatch(setUserData(result.data))
-            setErr("")
-            setLoading(false)
+            navigate("/")
         } catch (error) {
-           setErr(error?.response?.data?.message)
+           setErr(
+             error?.response?.data?.message ||
+             (error.code === "ECONNABORTED"
+               ? "Server is waking up. Please wait a moment and try again."
+               : "Unable to reach server. Check your connection and try again.")
+           )
+        } finally {
            setLoading(false)
         }
      }
