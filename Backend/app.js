@@ -24,7 +24,7 @@ const server = http.createServer(app);
 // Required on Render/Heroku so secure cookies work behind the HTTPS proxy
 app.set("trust proxy", 1);
 
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const allowedOrigins = (process.env.FRONTEND_URL1 || "http://localhost:5173" ||process.env.FRONTEND_URL2)
   .split(",")
   .map((url) => url.trim())
   .filter(Boolean);
