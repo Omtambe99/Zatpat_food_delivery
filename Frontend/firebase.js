@@ -7,11 +7,11 @@ import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey:import.meta.env.VITE_FIREBASE_APIKEY,
-  authDomain: "zatpat-food-delivery.firebaseapp.com",
-  projectId: "zatpat-food-delivery",
-  storageBucket: "zatpat-food-delivery.firebasestorage.app",
-  messagingSenderId: "693314883513",
-  appId: "1:693314883513:web:4840c943ecf3fb61a33068"
+  authDomain: "zatpat-food-auth.firebaseapp.com",
+  projectId: "zatpat-food-auth",
+  storageBucket: "zatpat-food-auth.firebasestorage.app",
+  messagingSenderId: "1063593409242",
+  appId: "1:1063593409242:web:9e602b37919629ef0583e3"
 };
 
 // Initialize Firebase

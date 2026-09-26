@@ -52,8 +52,9 @@ function SignUp() {
           return setErr("mobile no is required")
         }
         const provider=new GoogleAuthProvider()
-        const result=await signInWithPopup(auth,provider)
+        
   try {
+    const result=await signInWithPopup(auth,provider)
     const {data}=await axios.post(`${serverUrl}/api/auth/google-auth`,{
         fullName:result.user.displayName,
         email:result.user.email,
@@ -61,7 +62,9 @@ function SignUp() {
         mobile
     },{withCredentials:true})
    dispatch(setUserData(data))
+   navigate("/")
   } catch (error) {
+    setErr(error?.response?.data?.message || "Google Sign Up failed")
     console.log(error)
   }
      }
