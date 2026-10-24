@@ -9,9 +9,38 @@ const deliveryAssignmentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Shop"
     },
+    batch: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Batch",
+        default: null
+    },
+    stops: [
+        {
+            order: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Order"
+            },
+            shopOrderId: {
+                type: mongoose.Schema.Types.ObjectId
+            },
+            sequence: {
+                type: Number,
+                default: 1
+            },
+            status: {
+                type: String,
+                enum: ["pending", "delivered"],
+                default: "pending"
+            },
+            deliveredAt: {
+                type: Date,
+                default: null
+            }
+        }
+    ],
     shopOrderId:{
          type: mongoose.Schema.Types.ObjectId,
-         required:true
+         default: null
     },
     brodcastedTo:[
         {

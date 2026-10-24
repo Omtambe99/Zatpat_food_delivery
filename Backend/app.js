@@ -10,9 +10,12 @@ import userRouter from "./routes/user.routes.js";
 import itemRouter from "./routes/item.routes.js";
 import shopRouter from "./routes/shop.routes.js";
 import orderRouter from "./routes/order.routes.js";
+import batchRouter from "./routes/batch.routes.js";
+import sharedCartRouter from "./routes/sharedCart.routes.js";
 import http from "http";
 import { Server } from "socket.io";
 import { socketHandler } from "./socket.js";
+import { startBatchScheduler } from "./utils/batchScheduler.js";
 import fs from "fs";
 
 // Ensure public directory exists for multer temp uploads
@@ -69,9 +72,12 @@ app.use("/api/user", userRouter);
 app.use("/api/shop", shopRouter);
 app.use("/api/item", itemRouter);
 app.use("/api/order", orderRouter);
+app.use("/api/batch", batchRouter);
+app.use("/api/group-cart", sharedCartRouter);
 
 socketHandler(io);
 server.listen(port, () => {
   connectDb();
+  startBatchScheduler(io);
   console.log(`server started at ${port}`);
 });

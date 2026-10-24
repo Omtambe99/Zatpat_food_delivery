@@ -47,6 +47,11 @@ otpExpires:{
 deliveredAt:{
     type:Date,
     default:null
+},
+batch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Batch",
+    default: null
 }
 
 }, { timestamps: true })
@@ -66,11 +71,44 @@ const orderSchema = new mongoose.Schema({
         latitude: Number,
         longitude: Number
     },
+    itemsTotal: {
+        type: Number,
+        default: 0
+    },
+    deliveryFeeBase: {
+        type: Number,
+        default: 0
+    },
+    deliveryFee: {
+        type: Number,
+        default: 0
+    },
+    batchDiscountPct: {
+        type: Number,
+        default: 0
+    },
+    refundAmount: {
+        type: Number,
+        default: 0
+    },
     totalAmount: {
         type: Number
-    }
-    ,
+    },
     shopOrders: [shopOrderSchema],
+    batch: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Batch",
+        default: null
+    },
+    sharedCart: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SharedCart",
+        default: null
+    },
+    openToNeighbors: {
+        type: Boolean,
+        default: false
+    },
     payment:{
         type:Boolean,
         default:false

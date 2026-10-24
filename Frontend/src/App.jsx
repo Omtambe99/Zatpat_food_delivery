@@ -21,6 +21,12 @@ import useGetMyOrders from './hooks/useGetMyOrders'
 import useUpdateLocation from './hooks/useUpdateLocation'
 import TrackOrderPage from './pages/TrackOrderPage'
 import Shop from './pages/Shop'
+import BatchPage from './pages/BatchPage'
+import Rewards from './pages/Rewards'
+import SharedCartPage from './pages/SharedCartPage'
+import BatchInviteToast from './components/BatchInviteToast'
+import RewardToast from './components/RewardToast'
+import { useBatchSocket } from './hooks/useBatchSocket'
 import { useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { setSocket } from './redux/userSlice'
@@ -38,6 +44,7 @@ function App() {
   useGetShopByCity()
   useGetItemsByCity()
   useGetMyOrders()
+  useBatchSocket()
 
   useEffect(() => {
     const socketInstance = io(serverUrl, { withCredentials: true })
@@ -53,21 +60,32 @@ function App() {
   }, [userData?._id])
 
   return (
-    <Routes>
-      <Route path='/signup' element={!userData ? <SignUp /> : <Navigate to={"/"} />} />
-      <Route path='/signin' element={!userData ? <SignIn /> : <Navigate to={"/"} />} />
-      <Route path='/forgot-password' element={!userData ? <ForgotPassword /> : <Navigate to={"/"} />} />
-      <Route path='/' element={userData ? <Home /> : <Navigate to={"/signin"} />} />
-      <Route path='/create-edit-shop' element={userData ? <CreateEditShop /> : <Navigate to={"/signin"} />} />
-      <Route path='/add-item' element={userData ? <AddItem /> : <Navigate to={"/signin"} />} />
-      <Route path='/edit-item/:itemId' element={userData ? <EditItem /> : <Navigate to={"/signin"} />} />
-      <Route path='/cart' element={userData ? <CartPage /> : <Navigate to={"/signin"} />} />
-      <Route path='/checkout' element={userData ? <CheckOut /> : <Navigate to={"/signin"} />} />
-      <Route path='/order-placed' element={userData ? <OrderPlaced /> : <Navigate to={"/signin"} />} />
-      <Route path='/my-orders' element={userData ? <MyOrders /> : <Navigate to={"/signin"} />} />
-      <Route path='/track-order/:orderId' element={userData ? <TrackOrderPage /> : <Navigate to={"/signin"} />} />
-      <Route path='/shop/:shopId' element={userData ? <Shop /> : <Navigate to={"/signin"} />} />
-    </Routes>
+    <>
+      {userData?.role === "user" && (
+        <>
+          <BatchInviteToast />
+          <RewardToast />
+        </>
+      )}
+      <Routes>
+        <Route path='/signup' element={!userData ? <SignUp /> : <Navigate to={"/"} />} />
+        <Route path='/signin' element={!userData ? <SignIn /> : <Navigate to={"/"} />} />
+        <Route path='/forgot-password' element={!userData ? <ForgotPassword /> : <Navigate to={"/"} />} />
+        <Route path='/' element={userData ? <Home /> : <Navigate to={"/signin"} />} />
+        <Route path='/create-edit-shop' element={userData ? <CreateEditShop /> : <Navigate to={"/signin"} />} />
+        <Route path='/add-item' element={userData ? <AddItem /> : <Navigate to={"/signin"} />} />
+        <Route path='/edit-item/:itemId' element={userData ? <EditItem /> : <Navigate to={"/signin"} />} />
+        <Route path='/cart' element={userData ? <CartPage /> : <Navigate to={"/signin"} />} />
+        <Route path='/checkout' element={userData ? <CheckOut /> : <Navigate to={"/signin"} />} />
+        <Route path='/order-placed' element={userData ? <OrderPlaced /> : <Navigate to={"/signin"} />} />
+        <Route path='/my-orders' element={userData ? <MyOrders /> : <Navigate to={"/signin"} />} />
+        <Route path='/track-order/:orderId' element={userData ? <TrackOrderPage /> : <Navigate to={"/signin"} />} />
+        <Route path='/shop/:shopId' element={userData ? <Shop /> : <Navigate to={"/signin"} />} />
+        <Route path='/batch/:batchId' element={userData ? <BatchPage /> : <Navigate to={"/signin"} />} />
+        <Route path='/rewards' element={userData ? <Rewards /> : <Navigate to={"/signin"} />} />
+        <Route path='/group/:code' element={<SharedCartPage />} />
+      </Routes>
+    </>
   )
 }
 

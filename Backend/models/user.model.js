@@ -49,6 +49,20 @@ const userSchema = new mongoose.Schema(
       type: { type: String, enum: ["Point"], default: "Point" },
       coordinates: { type: [Number], default: [0, 0] },
     },
+    gamification: {
+      points: { type: Number, default: 0 },
+      streakDays: { type: Number, default: 0 },
+      lastBatchDate: { type: Date, default: null },
+      batchesHosted: { type: Number, default: 0 },
+      batchesJoined: { type: Number, default: 0 },
+      totalSaved: { type: Number, default: 0 },
+      badges: [
+        {
+          key: { type: String, required: true },
+          earnedAt: { type: Date, default: Date.now },
+        },
+      ],
+    },
   },
   { timestamps: true },
 );

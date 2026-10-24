@@ -9,6 +9,14 @@ function RecenterMap({ location }) {
   const map = useMap();
 
   useEffect(() => {
+    // Invalidate map size so Leaflet recalculates viewport bounds when modal opens
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  useEffect(() => {
     if (location.lat && location.lon) {
       map.setView([location.lat, location.lon], 16, { animate: true });
     }
@@ -34,6 +42,18 @@ function LocationPickerModal({
   const [locationMode, setLocationMode] = useState(initialMode);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Close on Escape key press
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -63,25 +83,29 @@ function LocationPickerModal({
   }, [open, initialAddress, initialLocation, initialMode]);
 
   const reverseGeocode = async (lat, lon) => {
-    const result = await axios.get(
-      `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${apiKey}`,
-    );
-    const firstResult = result?.data?.results?.[0];
-    const address =
-      firstResult?.address_line2 ||
-      firstResult?.address_line1 ||
-      firstResult?.formatted ||
-      searchText;
-    setResolvedAddress(address || "");
-    setSearchText(address || "");
-    setResolvedCity(
-      firstResult?.city ||
-      firstResult?.county ||
-      firstResult?.suburb ||
-      firstResult?.village ||
-      "",
-    );
-    setResolvedState(firstResult?.state || "");
+    try {
+      const result = await axios.get(
+        `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${apiKey}`
+      );
+      const firstResult = result?.data?.results?.[0];
+      const address =
+        firstResult?.address_line2 ||
+        firstResult?.address_line1 ||
+        firstResult?.formatted ||
+        searchText;
+      setResolvedAddress(address || "");
+      setSearchText(address || "");
+      setResolvedCity(
+        firstResult?.city ||
+          firstResult?.county ||
+          firstResult?.suburb ||
+          firstResult?.village ||
+          ""
+      );
+      setResolvedState(firstResult?.state || "");
+    } catch (err) {
+      console.log("Reverse geocoding error:", err);
+    }
   };
 
   const handleUseCurrentLocation = () => {
@@ -91,25 +115,32 @@ function LocationPickerModal({
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      setLocation({ lat, lon });
-      try {
-        setLoading(true);
-        await reverseGeocode(lat, lon);
-      } catch (error) {
-        console.log(error);
-        setMessage("Unable to resolve the current location.");
-      } finally {
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        setLocation({ lat, lon });
+        try {
+          await reverseGeocode(lat, lon);
+        } catch (error) {
+          console.log(error);
+          setMessage("Could not reverse-geocode your GPS location.");
+        } finally {
+          setLoading(false);
+        }
+      },
+      (err) => {
         setLoading(false);
-      }
-    });
+        setMessage("Unable to retrieve your location. Please check browser permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleSearch = async () => {
     if (!searchText.trim()) {
-      setMessage("Enter an address or landmark to search.");
+      setMessage("Please enter an address or area name to search.");
       return;
     }
 
@@ -117,68 +148,74 @@ function LocationPickerModal({
       setLoading(true);
       setMessage("");
       const result = await axios.get(
-        `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(searchText)}&apiKey=${apiKey}`,
+        `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+          searchText
+        )}&format=json&apiKey=${apiKey}`
       );
-      const firstFeature = result?.data?.features?.[0];
-      const latitude = firstFeature?.properties?.lat;
-      const longitude = firstFeature?.properties?.lon;
+      const firstResult = result?.data?.results?.[0];
 
-      if (latitude === undefined || longitude === undefined) {
-        setMessage("No matching location found.");
+      if (!firstResult) {
+        setMessage("No place found for that search. Try a more specific locality.");
         return;
       }
 
-      setLocation({ lat: latitude, lon: longitude });
-      setResolvedAddress(firstFeature?.properties?.formatted || searchText);
-      setSearchText(firstFeature?.properties?.formatted || searchText);
-      setResolvedCity(firstFeature?.properties?.city || firstFeature?.properties?.county || "");
-      setResolvedState(firstFeature?.properties?.state || "");
+      const nextLocation = {
+        lat: Number(firstResult.lat),
+        lon: Number(firstResult.lon),
+      };
+      setLocation(nextLocation);
+      const address =
+        firstResult.address_line2 ||
+        firstResult.address_line1 ||
+        firstResult.formatted ||
+        searchText;
+      setResolvedAddress(address);
+      setResolvedCity(
+        firstResult.city ||
+          firstResult.county ||
+          firstResult.suburb ||
+          firstResult.village ||
+          ""
+      );
+      setResolvedState(firstResult.state || "");
     } catch (error) {
       console.log(error);
-      setMessage("Unable to search that location.");
+      setMessage("Search failed. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleMarkerDragEnd = async (event) => {
-    const marker = event.target;
-    const { lat, lng } = marker.getLatLng();
-    setLocation({ lat, lon: lng });
-
+    const nextLatLng = event.target.getLatLng();
+    const lat = nextLatLng.lat;
+    const lon = nextLatLng.lng;
+    setLocation({ lat, lon });
     try {
       setLoading(true);
-      await reverseGeocode(lat, lng);
+      await reverseGeocode(lat, lon);
     } catch (error) {
       console.log(error);
-      setMessage("Unable to resolve the selected point.");
+      setMessage("Could not fetch address for this pin location.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!location.lat || !location.lon) {
-      setMessage("Select a valid location first.");
+      setMessage("Choose a location on the map before saving.");
       return;
     }
 
-    try {
-      setLoading(true);
-      await onSave({
-        lat: location.lat,
-        lon: location.lon,
-        locationMode,
-        address: resolvedAddress || searchText,
-        city: resolvedCity,
-        state: resolvedState,
-      });
-    } catch (error) {
-      console.log(error);
-      setMessage("Failed to save the location.");
-    } finally {
-      setLoading(false);
-    }
+    onSave({
+      lat: location.lat,
+      lon: location.lon,
+      address: resolvedAddress || searchText,
+      city: resolvedCity,
+      state: resolvedState,
+      locationMode,
+    });
   };
 
   if (!open) {
@@ -186,149 +223,182 @@ function LocationPickerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/60 bg-white shadow-[0_30px_120px_rgba(15,23,42,0.28)]">
-        <div className="flex items-center justify-between border-b border-orange-100 px-5 py-4">
+    <div
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-black/60 backdrop-blur-xs flex min-h-screen items-center justify-center p-3 sm:p-4 md:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-[#e8e6df] overflow-hidden my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[min(90vh,760px)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sticky Header - Always visible at top */}
+        <div className="flex items-center justify-between border-b border-[#e8e6df] px-5 sm:px-6 py-3.5 sm:py-4 bg-white shrink-0">
           <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-[#ff4d2d] font-semibold">
-              Location
+            <h2 className="text-base sm:text-lg font-bold text-[#18221e]">
+              Select Delivery Location
+            </h2>
+            <p className="text-[11px] sm:text-xs text-[#52605b]">
+              Pinpoints local restaurants and finds neighbors within 300m for batch discounts
             </p>
-            <h2 className="text-xl font-bold text-gray-900">Set your delivery spot</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition cursor-pointer shrink-0"
+            aria-label="Close modal"
           >
-            <RxCross2 size={22} />
+            <RxCross2 size={20} />
           </button>
         </div>
 
-        <div className="grid gap-5 bg-[linear-gradient(180deg,#fffaf7_0%,#ffffff_40%)] p-5 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4">
-            <div className="rounded-[24px] border border-orange-100 bg-white p-4 shadow-sm">
-              <label className="mb-3 block text-sm font-semibold text-gray-700">
-                Location mode
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setLocationMode("auto")}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    locationMode === "auto"
-                      ? "border-[#ff4d2d] bg-[#ff4d2d]/10 text-[#ff4d2d]"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-orange-200"
-                  }`}
-                >
-                  <span className="block font-semibold">Automatic</span>
-                    <span className="block text-xs opacity-80">Keep syncing GPS automatically</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLocationMode("manual")}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    locationMode === "manual"
-                      ? "border-[#ff4d2d] bg-[#ff4d2d]/10 text-[#ff4d2d]"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-orange-200"
-                  }`}
-                >
-                  <span className="block font-semibold">Manual</span>
-                    <span className="block text-xs opacity-80">Choose the spot on the map yourself</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-orange-100 bg-orange-50/40 p-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Search address or landmark
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                  placeholder="Try: home, office, market, street name..."
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-[#ff4d2d]"
-                />
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="rounded-xl bg-[#ff4d2d] px-4 py-3 text-white hover:bg-orange-600"
-                >
-                  Search
-                </button>
-              </div>
-              {message && (
-                <p className="mt-2 text-sm text-red-500">{message}</p>
-              )}
-              <p className="mt-2 text-xs text-gray-500">Search first, then drag the pin to the exact building or entrance.</p>
-            </div>
-
-            <div className="overflow-hidden rounded-[24px] border border-gray-200 shadow-sm">
-              <MapContainer
-                className="h-[360px] w-full"
-                center={[location.lat || 20.5937, location.lon || 78.9629]}
-                zoom={15}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {location.lat && location.lon && (
-                  <>
-                    <RecenterMap location={location} />
-                    <Marker
-                      position={[location.lat, location.lon]}
-                      draggable
-                      eventHandlers={{ dragend: handleMarkerDragEnd }}
-                    />
-                  </>
-                )}
-              </MapContainer>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4 rounded-[24px] border border-orange-100 bg-white p-4 shadow-sm">
-            <div className="rounded-[20px] bg-[#fff8f5] p-4">
-              <p className="text-sm font-semibold text-gray-700">Selected location</p>
-              <div className="mt-2 flex items-start gap-3">
-                <FaLocationDot className="mt-1 text-[#ff4d2d]" />
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {resolvedAddress || searchText || "No address selected yet"}
-                  </p>
-                  <p className="text-sm text-gray-500">Pick a point on the map or search for a place to update your saved location.</p>
+        {/* Scrollable Modal Content */}
+        <div className="overflow-y-auto flex-1 bg-[#fbfaf7] p-4 sm:p-5">
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr] items-start">
+            {/* Left Column: Search & Map */}
+            <div className="space-y-3.5">
+              {/* Location Mode Selector */}
+              <div className="rounded-2xl border border-[#e8e6df] bg-white p-3.5 shadow-xs">
+                <label className="mb-2 block text-xs font-bold text-[#18221e]">
+                  Location Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLocationMode("auto")}
+                    className={`rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                      locationMode === "auto"
+                        ? "border-[#0e5644] bg-[#edf7f3] text-[#0e5644]"
+                        : "border-[#e8e6df] bg-white text-[#52605b] hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="block font-bold text-xs">Automatic</span>
+                    <span className="block text-[11px] opacity-75 mt-0.5">Keep syncing GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationMode("manual")}
+                    className={`rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                      locationMode === "manual"
+                        ? "border-[#0e5644] bg-[#edf7f3] text-[#0e5644]"
+                        : "border-[#e8e6df] bg-white text-[#52605b] hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="block font-bold text-xs">Manual Pin</span>
+                    <span className="block text-[11px] opacity-75 mt-0.5">Drag to entrance</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Search Bar */}
+              <div className="rounded-2xl border border-[#d1e7dc] bg-[#edf7f3]/50 p-3.5">
+                <label className="mb-1.5 block text-xs font-bold text-[#18221e]">
+                  Search Address or Landmark
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSearch();
+                      }
+                    }}
+                    placeholder="Street, apartment, society, area..."
+                    className="w-full rounded-xl border border-[#e8e6df] bg-white px-3 py-2 text-xs text-[#18221e] outline-none focus:border-[#0e5644] focus:ring-2 focus:ring-[#0e5644]/15"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSearch}
+                    disabled={loading}
+                    className="rounded-xl bg-[#0e5644] px-4 py-2 text-xs font-bold text-white hover:bg-[#07392d] transition cursor-pointer disabled:opacity-60 shrink-0"
+                  >
+                    Search
+                  </button>
+                </div>
+                {message && (
+                  <p className="mt-2 text-xs text-rose-600 font-medium">{message}</p>
+                )}
+                <p className="mt-1.5 text-[11px] text-[#52605b]">
+                  Search your address, then drag the pin to your exact building entrance.
+                </p>
+              </div>
+
+              {/* Interactive Map */}
+              <div className="overflow-hidden rounded-2xl border border-[#e8e6df] shadow-xs">
+                <MapContainer
+                  className="h-[250px] sm:h-[280px] w-full"
+                  center={[location.lat || 20.5937, location.lon || 78.9629]}
+                  zoom={15}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {location.lat && location.lon && (
+                    <>
+                      <RecenterMap location={location} />
+                      <Marker
+                        position={[location.lat, location.lon]}
+                        draggable
+                        eventHandlers={{ dragend: handleMarkerDragEnd }}
+                      />
+                    </>
+                  )}
+                </MapContainer>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-600 hover:bg-blue-100"
-            >
-              <TbCurrentLocation size={18} />
-              Use current location
-            </button>
+            {/* Right Column: Address Details, GPS Trigger, and Save Button */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-[#e8e6df] bg-white p-4 sm:p-5 shadow-xs">
+              {/* Selected Coordinates & Address Card */}
+              <div className="rounded-xl bg-[#edf7f3]/50 border border-[#d1e7dc] p-3.5">
+                <p className="text-xs font-bold text-[#18221e] uppercase tracking-wider">
+                  Selected Location
+                </p>
+                <div className="mt-2 flex items-start gap-2.5">
+                  <FaLocationDot className="mt-0.5 text-[#0e5644] shrink-0" size={15} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-xs text-[#18221e] break-words">
+                      {resolvedAddress || searchText || "No address selected yet"}
+                    </p>
+                    <p className="text-[11px] text-[#55635e] font-mono mt-1">
+                      {location.lat && location.lon
+                        ? `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}`
+                        : "Drag marker to select"}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="rounded-[20px] border border-dashed border-orange-200 bg-orange-50/30 p-4 text-sm text-gray-600">
-              Your saved spot drives restaurant suggestions and order checkout.
+              {/* GPS Button */}
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 rounded-xl border border-[#d1e7dc] bg-[#edf7f3] px-4 py-2.5 text-xs font-bold text-[#0e5644] hover:bg-[#e2f1eb] transition cursor-pointer disabled:opacity-60"
+              >
+                <TbCurrentLocation size={16} />
+                <span>{loading ? "Detecting GPS..." : "Use Current GPS Location"}</span>
+              </button>
+
+              {/* Neighbor Batch Explainer */}
+              <div className="rounded-xl border border-[#e8e6df] bg-[#fbfaf7] p-3 text-xs text-[#52605b] leading-relaxed">
+                <p className="font-semibold text-[#18221e] mb-0.5">💡 Hyperlocal Pooling</p>
+                Your exact coordinates power the 300-meter Neighbor Batch radius so you never miss discounts when neighbors order.
+              </div>
+
+              {/* Action Button: Save Delivery Location */}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading || !location.lat || !location.lon}
+                className="mt-2 sm:mt-auto rounded-xl bg-[#0e5644] hover:bg-[#07392d] px-4 py-3 font-bold text-xs text-white transition active:scale-98 disabled:opacity-60 cursor-pointer shadow-sm flex items-center justify-center"
+              >
+                {loading ? "Saving..." : "Save Delivery Location"}
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={loading}
-              className="mt-auto rounded-xl bg-[#ff4d2d] px-4 py-3 font-semibold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {loading ? "Saving..." : "Save location"}
-            </button>
           </div>
         </div>
       </div>

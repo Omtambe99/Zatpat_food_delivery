@@ -79,7 +79,7 @@ export const deleteItem = async (req, res) => {
             return res.status(400).json({ message: "item not found" })
         }
         const shop = await Shop.findOne({ owner: req.userId })
-        shop.items = shop.items.filter(i => i !== item._id)
+        shop.items = shop.items.filter(i => String(i) !== String(item._id))
         await shop.save()
         await shop.populate({
             path: "items",
@@ -117,20 +117,25 @@ export const getItemByCity = async (req, res) => {
     }
 }
 
-export const getItemsByShop=async (req,res) => {
+export const getItemsByShop = async (req, res) => {
     try {
-        const {shopId}=req.params
-        const shop=await Shop.findById(shopId).populate("items")
-        if(!shop){
-            return res.status(400).json("shop not found")
+        const { shopId } = req.params;
+        const shop = await Shop.findById(shopId).populate("items");
+        if (!shop) {
+            return res.status(404).json({ message: "Shop not found" });
+        }
+        let items = shop.items;
+        if (!items || items.length === 0) {
+            items = await Item.find({ shop: shopId });
         }
         return res.status(200).json({
-            shop,items:shop.items
-        })
+            shop,
+            items: items || []
+        });
     } catch (error) {
-         return res.status(500).json({ message: `get item by shop error ${error}` })
+        return res.status(500).json({ message: `get item by shop error: ${error.message || error}` });
     }
-}
+};
 
 export const searchItems=async (req,res) => {
     try {
