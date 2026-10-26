@@ -10,6 +10,7 @@ import { priceCart, computeOrderPricing, computeDeliveryFee } from "../utils/pri
 import { haversineMeters } from "../utils/geo.js"
 import { awardPoints, grantBadge, updateStreak } from "../utils/gamification.js"
 import Batch from "../models/batch.model.js"
+import SharedCart from "../models/sharedCart.model.js"
 import { createBatchForOrder } from "./batch.controllers.js"
 import { closeBatch } from "../utils/batchScheduler.js"
 import { DISCOUNT_TIERS, BATCH_MAX_MEMBERS, BASE_DELIVERY_FEE, RIDER_PER_STOP_PAY, RIDER_EXTRA_STOP_BONUS } from "../config/batch.config.js"
@@ -628,6 +629,39 @@ export const updateOrderStatus = async (req, res) => {
                     status: updatedShopOrder.status,
                     userId: order.user._id
                 });
+            }
+        }
+
+        // Notify shared cart participants if this order originated from a group cart
+        if (order.sharedCart) {
+            const sharedCartDoc = await SharedCart.findById(order.sharedCart).populate("participants.user", "socketId fullName");
+            if (sharedCartDoc) {
+                if (status === "declined") {
+                    sharedCartDoc.status = "declined";
+                    await sharedCartDoc.save();
+                }
+                if (io) {
+                    io.to(`cart:${sharedCartDoc.code}`).emit("cartDeclined", {
+                        code: sharedCartDoc.code,
+                        orderId: order._id,
+                        shopName: updatedShopOrder?.shop?.name || "Restaurant",
+                        status,
+                        message: status === "declined" ? "The restaurant was unable to accept this group order." : `Group order status updated to ${status}.`
+                    });
+
+                    sharedCartDoc.participants.forEach((p) => {
+                        const sId = p.user?.socketId;
+                        if (sId) {
+                            io.to(sId).emit("cartDeclined", {
+                                code: sharedCartDoc.code,
+                                orderId: order._id,
+                                shopName: updatedShopOrder?.shop?.name || "Restaurant",
+                                status,
+                                message: status === "declined" ? "The restaurant was unable to accept your group order." : `Group order status updated to ${status}.`
+                            });
+                        }
+                    });
+                }
             }
         }
 

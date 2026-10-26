@@ -553,3 +553,97 @@ export const checkoutSharedCart = async (req, res) => {
     return res.status(500).json({ message: `checkout group cart error: ${error.message || error}` });
   }
 };
+
+/**
+ * GET /api/group-cart/user/active
+ * Finds the current user's most recent active group cart
+ */
+export const getMyActiveSharedCart = async (req, res) => {
+  try {
+    const cart = await SharedCart.findOne({
+      status: { $in: ["open", "locked"] },
+      expiresAt: { $gt: new Date() },
+      $or: [
+        { host: req.userId },
+        { "participants.user": req.userId }
+      ]
+    })
+      .sort({ updatedAt: -1 })
+      .populate("shop", "name image address")
+      .populate("host", "fullName");
+
+    if (!cart) {
+      return res.status(200).json({ cart: null });
+    }
+
+    return res.status(200).json(formatCartResponse(cart, req.userId));
+  } catch (error) {
+    return res.status(500).json({ message: `get active cart error: ${error.message || error}` });
+  }
+};
+
+/**
+ * POST /api/group-cart/:code/leave
+ * Participant voluntarily leaves the group cart and removes their items in real time
+ */
+export const leaveSharedCart = async (req, res) => {
+  try {
+    const code = req.params.code?.toUpperCase();
+    const cart = await SharedCart.findOne({ code })
+      .populate("shop", "name image address")
+      .populate("host", "fullName");
+
+    if (!cart) {
+      return res.status(404).json({ message: "Shared cart not found" });
+    }
+
+    if (cart.status === "checked_out") {
+      return res.status(400).json({ message: "Cannot leave a cart that is already checked out" });
+    }
+
+    const participantIdx = cart.participants.findIndex(
+      (p) => String(p.user?._id || p.user) === String(req.userId)
+    );
+
+    if (participantIdx === -1) {
+      return res.status(400).json({ message: "You are not a participant in this group cart" });
+    }
+
+    const leavingParticipant = cart.participants[participantIdx];
+    const leavingName = leavingParticipant.name || "A participant";
+    const isLeavingHost = String(cart.host?._id || cart.host) === String(req.userId);
+
+    // Remove participant from cart
+    cart.participants.splice(participantIdx, 1);
+
+    // Handle host leaving
+    if (isLeavingHost) {
+      if (cart.participants.length > 0) {
+        cart.host = cart.participants[0].user;
+      } else {
+        cart.status = "expired";
+      }
+    }
+
+    await cart.save();
+
+    const broadcastPayload = formatCartResponse(cart, null);
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`cart:${code}`).emit("cartUpdated", broadcastPayload);
+      io.to(`cart:${code}`).emit("participantLeft", {
+        code,
+        userId: req.userId,
+        name: leavingName,
+        newHostId: isLeavingHost && cart.participants.length > 0 ? cart.host : null
+      });
+    }
+
+    return res.status(200).json({
+      message: "Left group cart successfully",
+      cartStatus: cart.status
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `leave cart error: ${error.message || error}` });
+  }
+};

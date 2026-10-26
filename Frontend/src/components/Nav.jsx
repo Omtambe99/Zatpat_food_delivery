@@ -21,8 +21,31 @@ function Nav() {
   const [showSearch, setShowSearch] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeGroupCartCode, setActiveGroupCartCode] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkActiveCart = async () => {
+      try {
+        const res = await axios.get(`${serverUrl}/api/group-cart/user/active`, {
+          withCredentials: true,
+        });
+        if (res.data?.cart?.code) {
+          setActiveGroupCartCode(res.data.cart.code);
+        } else {
+          const localCode = localStorage.getItem("lastGroupCartCode");
+          if (localCode) setActiveGroupCartCode(localCode);
+        }
+      } catch (_) {
+        const localCode = localStorage.getItem("lastGroupCartCode");
+        if (localCode) setActiveGroupCartCode(localCode);
+      }
+    };
+    if (userData) {
+      checkActiveCart();
+    }
+  }, [userData]);
 
   const locationLabel = currentAddress || currentCity || "Set delivery location";
   const savedLocation =
@@ -223,6 +246,19 @@ function Nav() {
                 >
                   My Orders
                 </button>
+
+                {/* Active Group Cart Resumption Pill */}
+                {activeGroupCartCode && (
+                  <button
+                    className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-[#edf7f3] hover:bg-[#d1e7dc] text-[#0e5644] border border-[#d1e7dc] text-xs font-bold transition cursor-pointer shadow-2xs"
+                    onClick={() => navigate(`/group/${activeGroupCartCode}`)}
+                    title={`Return to active group cart #${activeGroupCartCode}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                    <span className="hidden sm:inline">Group Cart ({activeGroupCartCode})</span>
+                    <span className="sm:hidden">Group</span>
+                  </button>
+                )}
 
                 {/* Cart Icon with Counter */}
                 <button

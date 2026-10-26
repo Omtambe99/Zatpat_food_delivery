@@ -15,6 +15,8 @@ import {
   FaStore,
   FaLeaf,
   FaDrumstickBite,
+  FaSignOutAlt,
+  FaExclamationCircle,
 } from "react-icons/fa";
 import { IoIosArrowRoundBack } from "react-icons/io";
 import { ClipLoader } from "react-spinners";
@@ -34,6 +36,7 @@ export default function SharedCartPage() {
   const [copied, setCopied] = useState(false);
   const [locking, setLocking] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [leavingCart, setLeavingCart] = useState(false);
 
   // Host Checkout Modal
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -91,7 +94,10 @@ export default function SharedCartPage() {
   };
 
   useEffect(() => {
-    fetchSharedCart();
+    if (code) {
+      localStorage.setItem("lastGroupCartCode", code);
+      fetchSharedCart();
+    }
   }, [code]);
 
   useEffect(() => {
@@ -141,16 +147,35 @@ export default function SharedCartPage() {
       }
     };
 
+    const handleCartDeclined = (data) => {
+      const incomingCode = data.cart?.code || data.code;
+      if (incomingCode === code) {
+        setCartData((prev) => (prev ? { ...prev, status: "declined" } : prev));
+        alert(`Notice: The restaurant (${data.shopName || "Restaurant"}) was unable to accept this group order.`);
+      }
+    };
+
+    const handleParticipantLeft = (data) => {
+      const incomingCode = data.cart?.code || data.code;
+      if (incomingCode === code && data.name) {
+        console.log(`${data.name} left the group cart.`);
+      }
+    };
+
     socket.on("cartUpdated", handleCartUpdated);
     socket.on("cartLocked", handleCartLocked);
     socket.on("cartUnlocked", handleCartUnlocked);
     socket.on("cartCheckedOut", handleCartCheckedOut);
+    socket.on("cartDeclined", handleCartDeclined);
+    socket.on("participantLeft", handleParticipantLeft);
 
     return () => {
       socket.off("cartUpdated", handleCartUpdated);
       socket.off("cartLocked", handleCartLocked);
       socket.off("cartUnlocked", handleCartUnlocked);
       socket.off("cartCheckedOut", handleCartCheckedOut);
+      socket.off("cartDeclined", handleCartDeclined);
+      socket.off("participantLeft", handleParticipantLeft);
     };
   }, [socket, code, navigate]);
 
@@ -169,6 +194,30 @@ export default function SharedCartPage() {
       alert(err.response?.data?.message || "Failed to join group cart");
     } finally {
       setJoining(false);
+    }
+  };
+
+  // Handle Leave Cart (removes participant & their items in real-time)
+  const handleLeaveCart = async () => {
+    const confirmLeave = window.confirm(
+      "Are you sure you want to leave this group cart? Any items you picked will be removed from the shared order in real time."
+    );
+    if (!confirmLeave) return;
+
+    setLeavingCart(true);
+    try {
+      await axios.post(
+        `${serverUrl}/api/group-cart/${code}/leave`,
+        {},
+        { withCredentials: true }
+      );
+      localStorage.removeItem("lastGroupCartCode");
+      navigate("/cart");
+    } catch (err) {
+      console.error("Leave cart error:", err);
+      alert(err.response?.data?.message || "Failed to leave group cart");
+    } finally {
+      setLeavingCart(false);
     }
   };
 
@@ -416,18 +465,34 @@ export default function SharedCartPage() {
 
   const isLocked = cartData.status === "locked";
   const isCheckedOut = cartData.status === "checked_out";
+  const isDeclined = cartData.status === "declined";
 
   return (
     <div className="min-h-screen bg-[#fbfaf7] pb-24">
       {/* Top Navbar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#e8e6df] px-4 sm:px-8 py-3 flex items-center justify-between shadow-2xs">
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-1.5 text-[#52605b] hover:text-[#18221e] transition font-medium text-xs cursor-pointer"
-        >
-          <IoIosArrowRoundBack size={24} />
-          <span>Exit Cart</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-1.5 text-[#52605b] hover:text-[#18221e] transition font-medium text-xs cursor-pointer"
+            title="Browse without leaving room"
+          >
+            <IoIosArrowRoundBack size={24} />
+            <span>Browse</span>
+          </button>
+
+          {isParticipant && !isCheckedOut && (
+            <button
+              onClick={handleLeaveCart}
+              disabled={leavingCart}
+              className="flex items-center gap-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-xl transition font-semibold text-xs cursor-pointer ml-1"
+              title="Remove your dishes and leave this group room"
+            >
+              {leavingCart ? <ClipLoader size={12} color="#be123c" /> : <FaSignOutAlt size={11} />}
+              <span>Leave Cart</span>
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-bold bg-[#edf7f3] text-[#0e5644] px-3 py-1 rounded-full border border-[#d1e7dc]">
@@ -435,17 +500,47 @@ export default function SharedCartPage() {
           </span>
           <span
             className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-              isCheckedOut
+              isDeclined
+                ? "bg-rose-100 text-rose-800 border border-rose-300"
+                : isCheckedOut
                 ? "bg-purple-100 text-purple-700"
                 : isLocked
                 ? "bg-amber-100 text-amber-800"
                 : "bg-emerald-100 text-emerald-800"
             }`}
           >
-            {isCheckedOut ? "Checked Out" : isLocked ? "Locked" : "Open Room"}
+            {isDeclined ? "Declined by Restaurant" : isCheckedOut ? "Checked Out" : isLocked ? "Locked" : "Open Room"}
           </span>
         </div>
       </header>
+
+      {/* Restaurant Declined Banner */}
+      {isDeclined && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-4">
+          <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0">
+                <FaExclamationCircle size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-rose-950 text-sm">Order Declined by Restaurant</h3>
+                <p className="text-xs text-rose-800 mt-0.5">
+                  The restaurant was unable to fulfill this order. Host can unlock the cart to adjust dishes, or you may browse other restaurants.
+                </p>
+              </div>
+            </div>
+            {isHost && (
+              <button
+                onClick={handleToggleLock}
+                disabled={locking}
+                className="w-full sm:w-auto bg-rose-700 hover:bg-rose-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+              >
+                {locking ? <ClipLoader size={12} color="white" /> : "Unlock Cart to Edit"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hero Header */}
       <div className="bg-gradient-to-r from-[#0e5644] via-[#0b4737] to-[#07392d] text-white py-6 px-4 sm:px-8 shadow-sm">

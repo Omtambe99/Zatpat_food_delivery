@@ -145,26 +145,53 @@ function OwnerOrderCard({ data }) {
       )}
 
       {/* Status control */}
-      <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap justify-between items-center gap-3 pt-3 border-t border-gray-100">
         <span className="text-xs text-[#52605b]">
           Status:{" "}
-          <span className="font-bold capitalize text-[#0e5644]">
+          <span
+            className={`font-bold capitalize ${
+              data.shopOrders?.status === "declined"
+                ? "text-rose-600"
+                : "text-[#0e5644]"
+            }`}
+          >
             {data.shopOrders?.status}
           </span>
         </span>
 
-        <select
-          className="rounded-xl border border-[#e8e6df] px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#0e5644] focus:ring-2 focus:ring-[#0e5644]/15 text-[#18221e] bg-white cursor-pointer"
-          value=""
-          onChange={(e) =>
-            handleUpdateStatus(data._id, data.shopOrders.shop._id, e.target.value)
-          }
-        >
-          <option value="">Update Status...</option>
-          <option value="pending">Pending</option>
-          <option value="preparing">Preparing</option>
-          <option value="out of delivery">Out Of Delivery</option>
-        </select>
+        {data.shopOrders?.status !== "declined" && data.shopOrders?.status !== "delivered" ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Are you sure you want to decline this order? The customer and any group members will be notified immediately.")) {
+                  handleUpdateStatus(data._id, data.shopOrders.shop._id, "declined");
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/60 hover:bg-rose-100 font-semibold text-xs transition cursor-pointer"
+            >
+              Decline Order
+            </button>
+
+            <select
+              className="rounded-xl border border-[#e8e6df] px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#0e5644] focus:ring-2 focus:ring-[#0e5644]/15 text-[#18221e] bg-white cursor-pointer"
+              value=""
+              onChange={(e) =>
+                handleUpdateStatus(data._id, data.shopOrders.shop._id, e.target.value)
+              }
+            >
+              <option value="">Update Status...</option>
+              <option value="pending">Pending</option>
+              <option value="preparing">Preparing</option>
+              <option value="out of delivery">Out Of Delivery</option>
+              <option value="declined">Decline Order</option>
+            </select>
+          </div>
+        ) : data.shopOrders?.status === "declined" ? (
+          <span className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-xl">
+            Order Declined
+          </span>
+        ) : null}
       </div>
 
       {data.shopOrders?.status === "out of delivery" && (

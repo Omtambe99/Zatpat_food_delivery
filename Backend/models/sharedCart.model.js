@@ -69,7 +69,7 @@ const sharedCartSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "locked", "checked_out", "expired"],
+      enum: ["open", "locked", "checked_out", "expired", "declined"],
       default: "open"
     },
     expiresAt: {

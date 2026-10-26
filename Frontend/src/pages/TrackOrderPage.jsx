@@ -205,14 +205,22 @@ function TrackOrderPage() {
       }
     };
 
+    const handleCartDeclined = (data) => {
+      if (data.orderId === orderId || currentOrder?.sharedCart) {
+        handleGetOrder();
+      }
+    };
+
     socket.on("updateDeliveryLocation", handleDeliveryLocation);
     socket.on("update-status", handleStatusUpdate);
+    socket.on("cartDeclined", handleCartDeclined);
 
     return () => {
       socket.off("updateDeliveryLocation", handleDeliveryLocation);
       socket.off("update-status", handleStatusUpdate);
+      socket.off("cartDeclined", handleCartDeclined);
     };
-  }, [socket, orderId]);
+  }, [socket, orderId, currentOrder?.sharedCart]);
 
   useEffect(() => {
     handleGetOrder();
@@ -273,7 +281,9 @@ function TrackOrderPage() {
               </div>
               <span
                 className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                  shopOrder.status === "delivered"
+                  shopOrder.status === "declined"
+                    ? "bg-rose-100 text-rose-800 border border-rose-300"
+                    : shopOrder.status === "delivered"
                     ? "bg-emerald-100 text-emerald-800"
                     : shopOrder.status === "out of delivery"
                     ? "bg-purple-100 text-purple-700 animate-pulse"
@@ -282,11 +292,21 @@ function TrackOrderPage() {
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
-                {shopOrder.status}
+                {shopOrder.status === "declined" ? "Order Declined" : shopOrder.status}
               </span>
             </div>
 
-            {shopOrder.status !== "delivered" ? (
+            {shopOrder.status === "declined" ? (
+              <div className="text-xs text-rose-800 bg-rose-50 p-3.5 rounded-xl border border-rose-200 flex items-start gap-2.5">
+                <span className="text-base">❌</span>
+                <div>
+                  <p className="font-bold">This order was declined by the restaurant.</p>
+                  <p className="text-[11px] text-rose-700 mt-0.5">
+                    The kitchen was unable to accept this order at this time. If payment was made online, it will be automatically refunded.
+                  </p>
+                </div>
+              </div>
+            ) : shopOrder.status !== "delivered" ? (
               <>
                 {shopOrder.assignedDeliveryBoy ? (
                   <div className="text-xs text-[#52605b] bg-[#edf7f3]/60 p-3.5 rounded-xl border border-[#d1e7dc]">
